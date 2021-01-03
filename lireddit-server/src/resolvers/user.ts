@@ -6,6 +6,7 @@ import {
   Field,
   Ctx,
   ObjectType,
+  Query,
 } from "type-graphql";
 import { MyContext } from "src/types";
 import { User } from "../entities/User";
@@ -39,10 +40,21 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
+  @Query(() => User, { nullable: true })
+  me(@Ctx() { em, req }: MyContext) {
+    // You are not logged in
+    if (!(<any>req.session).userId) {
+      return null;
+    }
+
+    const user = em.findOne(User, { id: (<any>req.session).userId });
+    return user;
+  }
+
   @Mutation(() => UserResponse)
   async register(
     @Arg("options") options: UsernamePasswordInput,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     if (options.username.length <= 2) {
       return {
@@ -78,13 +90,19 @@ export class UserResolver {
         };
       }
     }
+
+    // Store user id session
+    // This will set a cookie on the user
+    // Keep them logged in
+    (<any>req.session).userId = user.id;
+
     return { user };
   }
 
   @Mutation(() => UserResponse)
   async login(
     @Arg("options") options: UsernamePasswordInput,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     const user = await em.findOne(User, { username: options.username });
     if (!user) {
@@ -108,6 +126,8 @@ export class UserResolver {
         ],
       };
     }
+
+    (<any>req.session).userId = user.id;
 
     return {
       user,
