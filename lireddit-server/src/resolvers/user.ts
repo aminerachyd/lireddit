@@ -43,7 +43,7 @@ export class UserResolver {
   @Query(() => User, { nullable: true })
   me(@Ctx() { em, req }: MyContext) {
     // You are not logged in
-    if (!(<any>req.session).userId) {
+    if (!req.session.userId) {
       return null;
     }
 
@@ -94,7 +94,7 @@ export class UserResolver {
     // Store user id session
     // This will set a cookie on the user
     // Keep them logged in
-    (<any>req.session).userId = user.id;
+    req.session.userId = user.id;
 
     return { user };
   }
@@ -127,7 +127,7 @@ export class UserResolver {
       };
     }
 
-    (<any>req.session).userId = user.id;
+    req.session.userId = user.id;
 
     return {
       user,
