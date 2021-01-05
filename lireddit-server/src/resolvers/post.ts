@@ -2,11 +2,13 @@ import { MyContext } from "src/types";
 import { Arg, Ctx, Mutation, Query, Resolver } from "type-graphql";
 import { Post } from "../entities/Post";
 
+const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms));
+
 @Resolver()
 export class PostResolver {
   @Query(() => [Post])
   // Le contexte qu'on a mis au niveau du Context dans index.ts
-  posts(@Ctx() { em }: MyContext): Promise<Post[]> {
+  async posts(@Ctx() { em }: MyContext): Promise<Post[]> {
     return em.find(Post, {});
   }
 
