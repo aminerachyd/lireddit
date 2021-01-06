@@ -1,26 +1,33 @@
-import { Entity, PrimaryKey, Property } from "@mikro-orm/core";
-import { Field, Int, ObjectType } from "type-graphql";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  BaseEntity,
+} from "typeorm";
+import { Field, ObjectType } from "type-graphql";
 
 // Entité à la fois pour postgres et pour GraphQL
 // Les premiers sont pour GraphQL
 // Les deuxièmes sont pour postgres
 @ObjectType()
 @Entity()
-export class Post {
-  @Field(() => Int)
-  @PrimaryKey()
+export class Post extends BaseEntity {
+  @Field()
+  @PrimaryGeneratedColumn()
   id!: number;
 
   @Field(() => String)
-  @Property({ type: "date" })
-  createdAt = new Date();
+  @CreateDateColumn()
+  createdAt: Date;
 
   @Field(() => String)
-  @Property({ type: "date", onUpdate: () => new Date() })
-  updatedAt = new Date();
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   // Si je ne spécifie pas le Field, je ne peux pas accéder à cet attribut depuis GraphQL
   @Field()
-  @Property({ type: "text" })
+  @Column()
   title!: string;
 }
