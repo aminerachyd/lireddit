@@ -1,12 +1,47 @@
-import { Arg, Mutation, Query, Resolver } from "type-graphql";
+import { isAuth } from "../middleware/isAuth";
+import { MyContext } from "../types";
+import {
+  Arg,
+  Ctx,
+  Field,
+  InputType,
+  Int,
+  Mutation,
+  Query,
+  Resolver,
+  UseMiddleware,
+} from "type-graphql";
 import { Post } from "../entities/Post";
+import { limits } from "argon2";
+import { getConnection } from "typeorm";
+
+@InputType()
+class PostInput {
+  @Field()
+  title: string;
+
+  @Field()
+  text: string;
+}
 
 @Resolver()
 export class PostResolver {
   @Query(() => [Post])
   // Le contexte qu'on a mis au niveau du Context dans index.ts
-  async posts(): Promise<Post[]> {
-    return Post.find();
+  async posts(
+    @Arg("limit", () => Int) limit: number,
+    @Arg("cursor", () => String, { nullable: true }) cursor: string | null
+  ): Promise<Post[]> {
+    const realLimit = Math.min(50, limit);
+    const qb = getConnection()
+      .getRepository(Post)
+      .createQueryBuilder("p")
+      .orderBy('"createdAt"', "DESC")
+      .take(realLimit);
+    if (cursor) {
+      qb.where('"createdAt" < :cursor', { cursor: new Date(parseInt(cursor)) });
+    }
+    return qb.getMany();
   }
 
   // Pour cette query, on peut retrouver un objet nul
@@ -20,12 +55,16 @@ export class PostResolver {
   }
 
   @Mutation(() => Post)
-  async createPost(@Arg("title") title: string): Promise<Post> {
-    // 2 sql queries
-    return Post.create({ title }).save();
+  @UseMiddleware(isAuth)
+  async createPost(
+    @Arg("input") input: PostInput,
+    @Ctx() { req }: MyContext
+  ): Promise<Post> {
+    return Post.create({ ...input, creatorId: req.session.userId }).save();
   }
 
   @Mutation(() => Post, { nullable: true })
+  @UseMiddleware(isAuth)
   async updatePost(
     @Arg("id") id: number,
     // Pour renvoyer un nul il faut expliciter le type graphql
@@ -42,6 +81,7 @@ export class PostResolver {
   }
 
   @Mutation(() => Boolean)
+  @UseMiddleware(isAuth)
   async deletePost(@Arg("id") id: number): Promise<boolean> {
     try {
       await Post.delete(id);

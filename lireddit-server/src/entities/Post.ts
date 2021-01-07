@@ -5,8 +5,10 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   BaseEntity,
+  ManyToOne,
 } from "typeorm";
 import { Field, ObjectType } from "type-graphql";
+import { User } from "./User";
 
 // Entité à la fois pour postgres et pour GraphQL
 // Les premiers sont pour GraphQL
@@ -18,6 +20,26 @@ export class Post extends BaseEntity {
   @PrimaryGeneratedColumn()
   id!: number;
 
+  // Si je ne spécifie pas le Field, je ne peux pas accéder à cet attribut depuis GraphQL
+  @Field()
+  @Column()
+  title!: string;
+
+  @Field()
+  @Column({ type: "int", default: 0 })
+  points!: number;
+
+  @Field()
+  @Column()
+  text!: string;
+
+  @Field()
+  @Column()
+  creatorId: number;
+
+  @ManyToOne(() => User, (user) => user.posts)
+  creator: User;
+
   @Field(() => String)
   @CreateDateColumn()
   createdAt: Date;
@@ -25,9 +47,4 @@ export class Post extends BaseEntity {
   @Field(() => String)
   @UpdateDateColumn()
   updatedAt: Date;
-
-  // Si je ne spécifie pas le Field, je ne peux pas accéder à cet attribut depuis GraphQL
-  @Field()
-  @Column()
-  title!: string;
 }
