@@ -1,19 +1,21 @@
-import { isAuth } from "../middleware/isAuth";
-import { MyContext } from "../types";
 import {
   Arg,
   Ctx,
   Field,
+  FieldResolver,
   InputType,
   Int,
   Mutation,
+  ObjectType,
   Query,
   Resolver,
+  Root,
   UseMiddleware,
 } from "type-graphql";
-import { Post } from "../entities/Post";
-import { limits } from "argon2";
 import { getConnection } from "typeorm";
+import { Post } from "../entities/Post";
+import { isAuth } from "../middleware/isAuth";
+import { MyContext } from "../types";
 
 @InputType()
 class PostInput {
@@ -24,24 +26,48 @@ class PostInput {
   text: string;
 }
 
-@Resolver()
+@ObjectType()
+class PaginatedPosts {
+  @Field(() => [Post])
+  posts: Post[];
+
+  @Field()
+  hasMore: boolean;
+}
+
+@Resolver(Post)
 export class PostResolver {
-  @Query(() => [Post])
+  // To send snippet instead of the whole text
+  // In the GraphQL query, you can choose textSnippet instead of text
+  @FieldResolver(() => String)
+  textSnippet(@Root() root: Post) {
+    return root.text.slice(0, 50);
+  }
+
+  @Query(() => PaginatedPosts)
   // Le contexte qu'on a mis au niveau du Context dans index.ts
   async posts(
     @Arg("limit", () => Int) limit: number,
     @Arg("cursor", () => String, { nullable: true }) cursor: string | null
-  ): Promise<Post[]> {
+  ): Promise<PaginatedPosts> {
+    // We fetch one extra post to get if there's more posts ahead or not
     const realLimit = Math.min(50, limit);
+    const realLimitPlusOne = realLimit + 1;
     const qb = getConnection()
       .getRepository(Post)
       .createQueryBuilder("p")
       .orderBy('"createdAt"', "DESC")
-      .take(realLimit);
+      .take(realLimitPlusOne);
     if (cursor) {
       qb.where('"createdAt" < :cursor', { cursor: new Date(parseInt(cursor)) });
     }
-    return qb.getMany();
+
+    const posts = await qb.getMany();
+
+    return {
+      posts: posts.slice(0, realLimit),
+      hasMore: posts.length === realLimitPlusOne,
+    };
   }
 
   // Pour cette query, on peut retrouver un objet nul

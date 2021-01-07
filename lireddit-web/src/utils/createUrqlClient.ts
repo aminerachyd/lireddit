@@ -1,15 +1,20 @@
-import { dedupExchange, Exchange, fetchExchange } from "urql";
-import { pipe, tap } from "wonka";
-import { cacheExchange } from "@urql/exchange-graphcache";
+import { cacheExchange, Data, Resolver } from "@urql/exchange-graphcache";
+import Router from "next/router";
 import {
-  LogoutMutation,
-  MeQuery,
-  MeDocument,
+  dedupExchange,
+  Exchange,
+  fetchExchange,
+  stringifyVariables,
+} from "urql";
+import { pipe, tap } from "wonka";
+import {
   LoginMutation,
+  LogoutMutation,
+  MeDocument,
+  MeQuery,
   RegisterMutation,
 } from "../generated/graphql";
 import { betterUpdateQuery } from "./betterUpdateQuery";
-import Router from "next/router";
 
 const errorExchange: Exchange = ({ forward }) => (ops$) => {
   return pipe(
@@ -22,6 +27,45 @@ const errorExchange: Exchange = ({ forward }) => (ops$) => {
   );
 };
 
+const cursorPagination = (): Resolver => {
+  return (_parent, fieldArgs, cache, info) => {
+    const { parentKey: entityKey, fieldName } = info;
+    // console.log(entityKey, fieldName);
+    const allFields = cache.inspectFields(entityKey);
+    // console.log(allFields);
+    const fieldInfos = allFields.filter((info) => info.fieldName === fieldName);
+    const size = fieldInfos.length;
+    if (size === 0) {
+      return undefined;
+    }
+    const fieldKey = `${fieldName}(${stringifyVariables(fieldArgs)})`;
+    const isItInTheCache = cache.resolve(
+      cache.resolve(entityKey, fieldKey) as string,
+      "posts"
+    );
+    info.partial = !isItInTheCache;
+    let hasMore = true;
+    const results: string[] = [];
+    fieldInfos.forEach((fi) => {
+      // Key to find the data/hasMore in the query
+      const key = cache.resolve(entityKey, fi.fieldKey) as string | Data;
+      const data = cache.resolve(key, "posts") as string[];
+      const _hasMore = cache.resolve(key, "hasMore") as boolean;
+      if (!_hasMore) {
+        hasMore = _hasMore;
+      }
+      results.push(...data);
+    });
+
+    return {
+      // Ce champ génère une erreursi il n'existe pas
+      __typename: "PaginatedPosts",
+      hasMore,
+      posts: results,
+    };
+  };
+};
+
 export const createUrqlClient = (ssrExchange: any) => ({
   url: "http://localhost:4000/graphql",
   fetchOptions: {
@@ -30,6 +74,14 @@ export const createUrqlClient = (ssrExchange: any) => ({
   exchanges: [
     dedupExchange,
     cacheExchange({
+      keys: {
+        PaginatedPosts: () => null,
+      },
+      resolvers: {
+        Query: {
+          posts: cursorPagination(),
+        },
+      },
       updates: {
         Mutation: {
           logout: (_result, args, cache, info) => {
