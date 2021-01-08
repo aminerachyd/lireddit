@@ -113,9 +113,17 @@ export class PostResolver {
     const realLimit = Math.min(50, limit);
     const realLimitPlusOne = realLimit + 1;
 
-    const replacements: any[] = [realLimitPlusOne, req.session.userId];
+    const replacements: any[] = [realLimitPlusOne];
+
+    if (req.session.userId) {
+      replacements.push(req.session.userId);
+    }
+
+    let cursorIdx = 3;
+
     if (cursor) {
       replacements.push(new Date(parseInt(cursor)));
+      cursorIdx = replacements.length;
     }
 
     const posts = await getConnection().query(
@@ -135,7 +143,7 @@ export class PostResolver {
     }
     from post p
     inner join public.user u on u.id = p."creatorId"
-    ${cursor ? `where p."createdAt" < $3` : ""}
+    ${cursor ? `where p."createdAt" < $${cursorIdx}` : ""}
     order by p."createdAt" DESC
     limit $1;
     `,
@@ -153,9 +161,9 @@ export class PostResolver {
   post(
     // L'argument GraphQL
     // Le premier type est pour GraphQL, le second est pour typescript
-    @Arg("id") id: number
+    @Arg("id", () => Int) id: number
   ): Promise<Post | undefined> {
-    return Post.findOne(id);
+    return Post.findOne(id, { relations: ["creator"] });
   }
 
   @Mutation(() => Post)

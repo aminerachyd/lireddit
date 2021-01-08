@@ -6,7 +6,6 @@ import {
   Ctx,
   ObjectType,
   Query,
-  Args,
   FieldResolver,
   Root,
 } from "type-graphql";
