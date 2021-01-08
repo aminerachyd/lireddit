@@ -18,7 +18,7 @@ import { Updoot } from "./Updoot";
 @ObjectType()
 @Entity()
 export class Post extends BaseEntity {
-  @Field(() => Int)
+  @Field()
   @PrimaryGeneratedColumn()
   id!: number;
 
@@ -28,12 +28,15 @@ export class Post extends BaseEntity {
   title!: string;
 
   @Field()
+  @Column()
+  text!: string;
+
+  @Field()
   @Column({ type: "int", default: 0 })
   points!: number;
 
-  @Field()
-  @Column()
-  text!: string;
+  @Field(() => Int, { nullable: true })
+  voteStatus: number | null;
 
   @Field()
   @Column()
@@ -43,7 +46,7 @@ export class Post extends BaseEntity {
   @ManyToOne(() => User, (user) => user.posts)
   creator: User;
 
-  @OneToMany(() => Updoot, (updoot) => updoot.user)
+  @OneToMany(() => Updoot, (updoot) => updoot.post)
   updoots: Updoot[];
 
   @Field(() => String)

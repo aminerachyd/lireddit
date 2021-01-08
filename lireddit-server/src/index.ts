@@ -30,6 +30,7 @@ const main = async () => {
   });
   await conn.runMigrations();
 
+  // await Updoot.delete({});
   // await Post.delete({});
 
   const app = express();
