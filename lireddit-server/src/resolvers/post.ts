@@ -178,25 +178,46 @@ export class PostResolver {
   @Mutation(() => Post, { nullable: true })
   @UseMiddleware(isAuth)
   async updatePost(
-    @Arg("id") id: number,
+    @Arg("id", () => Int) id: number,
     // Pour renvoyer un nul il faut expliciter le type graphql
-    @Arg("title", () => String, { nullable: true }) title: string
+    @Arg("title") title: string,
+    @Arg("text") text: string,
+    @Ctx() { req }: MyContext
   ): Promise<Post | null> {
-    const post = await Post.findOne(id);
-    if (!post) {
-      return null;
-    }
-    if (typeof title !== "undefined") {
-      await Post.update({ id }, { title });
-    }
-    return post;
+    const result = await getConnection()
+      .createQueryBuilder()
+      .update(Post)
+      .set({ title, text })
+      .where('id = :id and "creatorId"= :creatorId', {
+        id,
+        creatorId: req.session.userId,
+      })
+      .returning("*")
+      .execute();
+
+    return result.raw[0];
   }
 
   @Mutation(() => Boolean)
   @UseMiddleware(isAuth)
-  async deletePost(@Arg("id") id: number): Promise<boolean> {
+  async deletePost(
+    @Arg("id", () => Int) id: number,
+    @Ctx() { req }: MyContext
+  ): Promise<boolean> {
     try {
-      await Post.delete(id);
+      // NOT CASCADE WAY
+      // const post = await Post.findOne(id);
+      // if (!post) {
+      //   return false;
+      // }
+      // if (post.creatorId !== req.session.userId) {
+      //   throw new Error("Not authorized");
+      // }
+      // await Updoot.delete({ postId: id });
+      // await Post.delete({ id });
+
+      // CASCADE WAY, check Post Updoot entity
+      await Post.delete({ id, creatorId: req.session.userId });
     } catch (error) {
       return false;
     }
